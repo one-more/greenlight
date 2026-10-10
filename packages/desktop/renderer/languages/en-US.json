@@ -81,6 +81,17 @@
         "controllerDetectedTitle": "Controllers detected",
         "controllerDetectedDescription": "If you have a controller connected but it is not showing up, try to press a button on the controller to detect it.",
         "noControllerDetected": "No controller detected",
+        "controllerPickerTitle": "Controller",
+        "controllerPickerDescription": "Choose which controller is sent to the console. Press a button on it if it is missing from this list.",
+        "controllerPickerFirst": "First connected controller",
+        "controllerPickerFirstMeta": "Uses whichever controller is connected when a stream starts.",
+        "controllerPickerUsed": "Used for streaming",
+        "controllerPickerIdle": "Idle. Press a button or move a stick to test it.",
+        "controllerPickerEmpty": "No controller yet. Click this window, then press a button.",
+        "controllerPickerMissing": "The controller you picked is disconnected. The first connected controller will be used until it comes back.",
+        "controllerPickerRumbleOn": "Rumble available",
+        "controllerPickerRumbleOff": "No rumble",
+        "controllerPickerSlot": "Controller {{n}}",
         "keyboardMappingsTitle": "Keyboard mappings"
       },
 

@@ -67,3 +67,47 @@ div#component_settings_sidebar_content input[type='checkbox'] {
     height: 16px;
     top: 3px;
 }
+
+button.controller-choice {
+    display: block;
+    width: 100%;
+    margin: 0 0 12px 0;
+    padding: 14px 16px;
+    text-align: left;
+    color: #ffffff;
+    cursor: pointer;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    font: inherit;
+    text-shadow: inherit;
+}
+
+button.controller-choice:hover {
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+button.controller-choice.is-selected {
+    border-color: #107c10;
+    background: rgba(16, 124, 16, 0.22);
+}
+
+button.controller-choice .controller-choice-title {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+button.controller-choice .controller-choice-meta,
+button.controller-choice .controller-choice-activity {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: normal;
+    opacity: 0.75;
+}
+
+button.controller-choice.is-selected .controller-choice-activity {
+    opacity: 1;
+    color: #b6f5c4;
+}

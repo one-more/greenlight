@@ -1,6 +1,7 @@
 import https from 'https'
 import Application from '../application'
 import { Address6 } from 'ip-address'
+import { describeIceCandidate } from '../../shared/iceLog'
 
 export interface playResult {
     sessionPath:string;
@@ -314,6 +315,10 @@ export default class xCloudApi {
             }
 
             this.post('/v5/sessions/'+this._type+'/'+sessionId+'/ice', postData).then(() => {
+                this._application.log('stream-path', `posted ${postData.candidate.length} local candidates to ${this._host}`)
+                postData.candidate.forEach((item, index) => {
+                    this._application.log('stream-path', `local #${index + 1} ${describeIceCandidate(item.candidate)}`)
+                })
 
                 this.get('/v5/sessions/'+this._type+'/'+sessionId+'/ice').then((iceResult:exchangeResult) => {
                     const exchangeIce = JSON.parse(iceResult.exchangeResponse)
@@ -323,10 +328,12 @@ export default class xCloudApi {
                     // Find Teredo Address and extract remote ip
                     for(const candidate in exchangeIce){
                         const candidateAddress = exchangeIce[candidate].candidate.split(' ')
+                        this._application.log('stream-path', `console #${Number(candidate) + 1} ${describeIceCandidate(exchangeIce[candidate].candidate)}`)
                         
                         if(candidateAddress.length > 4 && candidateAddress[4].substr(0, 4) === '2001'){
                             const address = new Address6(candidateAddress[4])
                             const teredo = address.inspectTeredo()
+                            this._application.log('stream-path', `teredo ${candidateAddress[4]} rewritten to public IPv4 ${teredo.client4} ports 9002 and ${teredo.udpPort}`)
 
                             computedCandidates.push({
                                 candidate: 'a=candidate:10 1 UDP 1 '+teredo.client4+' 9002 typ host ',

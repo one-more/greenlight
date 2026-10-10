@@ -1,8 +1,10 @@
 import { app as ElectronApp, BrowserWindow, dialog } from 'electron'
+import { createSocket } from 'dgram'
 import serve from 'electron-serve'
 import Store from 'electron-store'
 import Debug from 'debug'
 import { createWindow, xboxWorker, updater } from './helpers'
+import { appendStreamPathLog, streamPathLogFile } from './helpers/streamPathFile'
 import Authentication from './authentication'
 import Ipc from './ipc'
 import WebUI from './webui'
@@ -44,6 +46,10 @@ export default class Application {
     constructor(){
         console.log(__filename+'[constructor()] Starting Greenlight v'+pkg.version)
         this._log = Debug('greenlight')
+        ElectronApp.setName('Greenlight')
+        appendStreamPathLog('--- app start ---')
+        appendStreamPathLog(`log file ${streamPathLogFile()}`)
+        console.log(`[stream-path] writing ${streamPathLogFile()}`)
 
         // ElectronApp.commandLine.appendSwitch('use-vulkan')
         // ElectronApp.commandLine.appendSwitch('use-angle', 'vulkan')
@@ -55,7 +61,23 @@ export default class Application {
         // ElectronApp.commandLine.appendSwitch('ozone-platform-hint', 'x11')
         // ElectronApp.commandLine.appendSwitch('ignore-gpu-blocklist')
         // ElectronApp.commandLine.appendSwitch('no-sandbox')
-        ElectronApp.commandLine.appendSwitch('enable-zero-copy')
+        // Advertise the real LAN address so an Xbox on the same network can
+        // connect directly instead of through a relay.
+        ElectronApp.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns')
+        // Chromium's default video playout window is 0–10s. A swinging LAN
+        // round-trip fills that window and the picture lands seconds late.
+        // This overrides the delay on every received frame and keeps it under 60ms.
+        ElectronApp.commandLine.appendSwitch('force-fieldtrials', 'WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:60/')
+        appendStreamPathLog('video playout delay capped at 0-60ms')
+        // Keep the player on the fast path when macOS would otherwise treat
+        // Electron as a background page (App Nap, occluded window, hidden timers).
+        ElectronApp.commandLine.appendSwitch('disable-renderer-backgrounding')
+        ElectronApp.commandLine.appendSwitch('disable-background-timer-throttling')
+        ElectronApp.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+        appendStreamPathLog('renderer background throttling disabled')
+        if(process.platform !== 'darwin'){
+            ElectronApp.commandLine.appendSwitch('enable-zero-copy')
+        }
 
         this.readStartupFlags()
         this.loadApplicationDefaults()
@@ -71,6 +93,9 @@ export default class Application {
 
     log(namespace = 'application', ...args){
         this._log.extend(namespace)(...args)
+        if(namespace === 'stream-path'){
+            appendStreamPathLog(args.map((item) => typeof item === 'string' ? item : JSON.stringify(item)).join(' '))
+        }
     }
 
     getStartupFlags(){
@@ -127,6 +152,7 @@ export default class Application {
 
             this.log('electron', __filename+'[loadApplicationDefaults()] Electron has been fully loaded. Ready to open windows')
 
+            this.requestLocalNetworkAccess()
             this.openMainWindow()
 
             // Check authentication
@@ -244,7 +270,7 @@ export default class Application {
             const port = process.argv[2] || 3000
             this._mainWindow.loadURL(`http://localhost:${port}/home`)
 
-            if(this._isCi !== true){
+            if(this._isCi !== true && process.env.GREENLIGHT_DEVTOOLS === '1'){
                 this._mainWindow.webContents.openDevTools()
                 this.openGPUWindow()
             }
@@ -264,6 +290,31 @@ export default class Application {
 
         // Open DevTools
         this._gpuWindow.webContents.openDevTools()
+    }
+
+    requestLocalNetworkAccess(){
+        if(this._isMac === false){
+            return
+        }
+
+        // A packet to the local mDNS group is what makes macOS show the
+        // Local Network prompt for this app. The stream itself runs in a
+        // helper process, which never appears in that settings list.
+        const socket = createSocket({ type: 'udp4', reuseAddr: true })
+        let closed = false
+        const closeSocket = () => {
+            if(closed === true){
+                return
+            }
+            closed = true
+            socket.close()
+        }
+
+        socket.once('error', closeSocket)
+        socket.bind(0, () => {
+            const payload = Buffer.from('greenlight')
+            socket.send(payload, 5353, '224.0.0.251', closeSocket)
+        })
     }
 
     quit(){

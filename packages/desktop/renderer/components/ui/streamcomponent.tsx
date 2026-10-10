@@ -172,6 +172,11 @@ function StreamComponent({
         }, droppedData, document.getElementById('component_streamcomponent_debug_webrtc_dropped'))
 
         webRtcStatsInterval = setInterval(() => {
+            const debugPanel = document.getElementById('component_streamcomponent_debug')
+            if (debugPanel === null || debugPanel.className.includes('hidden')) {
+                return
+            }
+
             if (xPlayer._webrtcClient !== undefined) {
                 xPlayer._webrtcClient.getStats().then((stats) => {
                     let statsOutput = ''

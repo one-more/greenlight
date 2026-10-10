@@ -1,5 +1,6 @@
 import Application from '../application'
 import xCloudApi, { playResult } from './xcloudapi'
+import { acquireStreamPerformance, releaseStreamPerformance } from './streamPerformance'
 
 interface streamSession {
     id: string;
@@ -54,6 +55,7 @@ export default class StreamManager {
                 }
                 this._sessions[sessionId] = streamSession
                 this.monitorSession(sessionId)
+                acquireStreamPerformance(this._application._mainWindow)
 
                 resolve(sessionId)
             }).catch((error) => {
@@ -74,6 +76,9 @@ export default class StreamManager {
                 console.log('Current sessions:', this._sessions)
                 delete this._sessions[sessionId]
                 console.log('new sessions:', this._sessions)
+                if(Object.keys(this._sessions).length === 0){
+                    releaseStreamPerformance(this._application._mainWindow)
+                }
 
                 resolve(result)
             }).catch((error) => {
@@ -213,6 +218,9 @@ export default class StreamManager {
                 if(error.status === 404){
                     this._application.log('StreamManager', 'Session not found on server. Removing session...')
                     delete this._sessions[sessionId]
+                    if(Object.keys(this._sessions).length === 0){
+                        releaseStreamPerformance(this._application._mainWindow)
+                    }
                 } else {
                     this.monitorSession(sessionId)
                 }

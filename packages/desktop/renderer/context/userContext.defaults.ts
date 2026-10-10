@@ -35,6 +35,7 @@ export const defaultSettings = {
         n: 'Nexus',
     },
     input_newgamepad: false,
+    input_gamepad_id: '',
     app_lowresolution: false,
 
     video_enabled: true,

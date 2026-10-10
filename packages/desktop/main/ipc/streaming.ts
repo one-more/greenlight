@@ -79,6 +79,13 @@ export default class IpcStreaming extends IpcBase {
         })
     }
 
+    logPath(args:{ message?: string }){
+        if(args?.message){
+            this._application.log('stream-path', args.message)
+        }
+        return Promise.resolve(true)
+    }
+
     activeSessions(){
         return this._streamManager.getActiveSessions()
     }

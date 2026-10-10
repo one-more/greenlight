@@ -18,6 +18,10 @@ publish:
 # Mac OS configuration
 mac:
   category: public.app-category.games
+  extendInfo:
+    NSLocalNetworkUsageDescription: Greenlight streams video and controller input from your Xbox on the local network.
+    NSBonjourServices:
+      - _greenlight._tcp
   # icon: "src/app/assets/images/icon.icns"
   target: 
   - target: dmg

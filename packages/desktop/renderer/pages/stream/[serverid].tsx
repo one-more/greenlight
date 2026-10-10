@@ -7,6 +7,8 @@ import { useSettings } from '../../context/userContext'
 import StreamComponent from '../../components/ui/streamcomponent'
 import StreamPreload from '../../components/ui/streampreload'
 import Ipc from '../../lib/ipc'
+import { installSelectedGamepad } from '../../lib/gamepadSelection'
+import { applyLowLatencyReceivers, logIceList, logSelectedIcePath, logStreamPath, waitForLocalIce } from '../../lib/streamPath'
 import { useTranslation } from 'react-i18next'
 
 function Stream() {
@@ -16,6 +18,7 @@ function Stream() {
 
     let streamStateInterval
     let keepaliveInterval
+    let pathLogInterval
 
     const [xPlayer, setxPlayer] = React.useState(undefined)
     const [sessionId, setSessionId] = React.useState('')
@@ -30,7 +33,10 @@ function Stream() {
             serverId = (router.query.serverid as string).substr(7)
         }
 
+        let restoreGamepad = () => {}
+
         if(xPlayer !== undefined){
+            restoreGamepad = installSelectedGamepad(settings.input_gamepad_id || '')
             document.getElementById('streamComponentHolder').innerHTML = '<div id="streamComponent" class="size_'+settings.video_size+'"></div>'
             xPlayer.bind()
 
@@ -65,22 +71,30 @@ function Stream() {
                 }).then((sdpResult:any) => {
                     xPlayer.setRemoteOffer(sdpResult.sdp)
 
-                    // Gather candidates
-                    const iceCandidates = xPlayer.getIceCandidates()
+                    waitForLocalIce(xPlayer._webrtcClient, () => xPlayer.getIceCandidates()).then((iceCandidates) => {
                     const candidates = []
+                    let skippedTcp = 0
                     for(const candidate in iceCandidates){
+                        const line = iceCandidates[candidate].candidate || ''
+                        if(/\stcp\s/i.test(line)){
+                            skippedTcp++
+                            continue
+                        }
                         candidates.push({
-                            candidate: iceCandidates[candidate].candidate,
+                            candidate: line,
                             sdpMLineIndex: iceCandidates[candidate].sdpMLineIndex,
                             sdpMid: iceCandidates[candidate].sdpMid,
                         })
+                    }
+                    if(skippedTcp > 0){
+                        logStreamPath(`skipped ${skippedTcp} tcp candidates so the stream stays on udp`)
                     }
 
                     Ipc.send('streaming', 'sendIce', {
                         sessionId: sessionId,
                         ice: candidates,
                     }).then((iceResult:any) => {
-                        console.log(iceResult)
+                        logIceList('remote', iceResult || [])
                         xPlayer.setIceCandidates(iceResult)
 
                         // All done. Waiting for the event 'connectionstate' to be triggered
@@ -88,6 +102,7 @@ function Stream() {
                     }).catch((error) => {
                         console.log('ICE Exchange error:', error)
                         alert(t('errors.ICEExchangeError') + ' ' + JSON.stringify(error))
+                    })
                     })
 
                 }).catch((error) => {
@@ -114,6 +129,28 @@ function Stream() {
                         if(settings.video_enabled === false){
                             xPlayer._videoComponent._videoRender.style.opacity = 0
                         }
+
+                        const logPath = () => {
+                            if(xPlayer._webrtcClient){
+                                applyLowLatencyReceivers(xPlayer._webrtcClient, true)
+                                logSelectedIcePath(xPlayer._webrtcClient).catch((error) => {
+                                    console.log('[stream-path] failed to read selected path', error)
+                                })
+                            }
+                        }
+                        if(xPlayer._webrtcClient){
+                            applyLowLatencyReceivers(xPlayer._webrtcClient)
+                        }
+                        logPath()
+                        clearInterval(pathLogInterval)
+                        let pathLogCount = 0
+                        pathLogInterval = setInterval(() => {
+                            pathLogCount++
+                            logPath()
+                            if(pathLogCount >= 6){
+                                clearInterval(pathLogInterval)
+                            }
+                        }, 5000)
 
                         // Start keepalive loop
                         keepaliveInterval = setInterval(() => {
@@ -217,12 +254,18 @@ function Stream() {
 
         // Modal window
         return () => {
+            restoreGamepad()
+
             if(xPlayer !== undefined){
                 xPlayer.close()
             }
 
             if(keepaliveInterval){
                 clearInterval(keepaliveInterval)
+            }
+
+            if(pathLogInterval){
+                clearInterval(pathLogInterval)
             }
 
             if(streamStateInterval){

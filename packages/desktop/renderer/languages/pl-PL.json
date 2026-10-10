@@ -81,6 +81,17 @@
         "controllerDetectedTitle": "Wykryte kontrolery",
         "controllerDetectedDescription": "Jeśli masz kontroler, ale się nie pokazuje spróbuj wcisnąć przycisk na kontrolerze, aby go wykryć.",
         "noControllerDetected": "Nie wykryto kontrolera",
+        "controllerPickerTitle": "Kontroler",
+        "controllerPickerDescription": "Wybierz kontroler wysyłany do konsoli. Naciśnij przycisk, jeśli nie ma go na liście.",
+        "controllerPickerFirst": "Pierwszy podłączony kontroler",
+        "controllerPickerFirstMeta": "Używa kontrolera podłączonego w momencie startu transmisji.",
+        "controllerPickerUsed": "Używany do streamingu",
+        "controllerPickerIdle": "Bezczynny. Naciśnij przycisk lub porusz gałką, aby sprawdzić.",
+        "controllerPickerEmpty": "Brak kontrolera. Kliknij to okno, a potem naciśnij przycisk.",
+        "controllerPickerMissing": "Wybrany kontroler jest odłączony. Do jego powrotu używany będzie pierwszy podłączony.",
+        "controllerPickerRumbleOn": "Wibracje dostępne",
+        "controllerPickerRumbleOff": "Brak wibracji",
+        "controllerPickerSlot": "Kontroler {{n}}",
         "keyboardMappingsTitle": "Mapowanie klawiatury"
       },
 

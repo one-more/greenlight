@@ -81,6 +81,17 @@
         "controllerDetectedTitle": "Обнаружены контроллеры",
         "controllerDetectedDescription": "Если у вас подключен контроллер, но он не отображается, попробуйте нажать кнопку на контроллере для обнаружения.",
         "noControllerDetected": "Контроллер не обнаружен",
+        "controllerPickerTitle": "Контроллер",
+        "controllerPickerDescription": "Выберите контроллер, который отправляется на консоль. Нажмите кнопку, если его нет в списке.",
+        "controllerPickerFirst": "Первый подключённый контроллер",
+        "controllerPickerFirstMeta": "Используется контроллер, подключённый на момент старта трансляции.",
+        "controllerPickerUsed": "Используется для стрима",
+        "controllerPickerIdle": "Ожидание. Нажмите кнопку или подвигайте стик для проверки.",
+        "controllerPickerEmpty": "Контроллера пока нет. Нажмите на это окно, затем кнопку на контроллере.",
+        "controllerPickerMissing": "Выбранный контроллер отключён. Пока он не вернётся, будет использован первый подключённый.",
+        "controllerPickerRumbleOn": "Вибрация доступна",
+        "controllerPickerRumbleOff": "Без вибрации",
+        "controllerPickerSlot": "Контроллер {{n}}",
         "keyboardMappingsTitle": "Назначения клавиш"
       },
 

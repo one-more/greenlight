@@ -5,6 +5,7 @@ import SettingsSidebar from '../../components/settings/sidebar'
 import Card from '../../components/ui/card'
 
 import { useSettings } from '../../context/userContext'
+import { listConnectedGamepads, ListedGamepad } from '../../lib/gamepadSelection'
 
 import { useTranslation } from 'react-i18next'
 
@@ -85,22 +86,31 @@ function KeySettings({keyConfigs, setKeyConfig}) {
 
 function SettingsInput() {
     const { settings, setSettings} = useSettings()
-    const [ controllerPing, setControllerPing] = React.useState(0)
+    const [ controllers, setControllers ] = React.useState<ListedGamepad[]>([])
 
     const [controllerKeys, setControllerKeys] = React.useState(settings.input_mousekeyboard_config)
 
     const { t } = useTranslation()
 
     React.useEffect(() => {
-        console.log('Last controller check:', controllerPing)
-        const controllerInterval = setInterval(() => {
-            setControllerPing(Date.now())
-        }, 1000)
+        const refreshControllers = () => {
+            setControllers(listConnectedGamepads())
+        }
+
+        refreshControllers()
+        const controllerInterval = setInterval(refreshControllers, 150)
 
         return () => {
             clearInterval(controllerInterval)
         }
-    })
+    }, [])
+
+    function selectController(id: string) {
+        setSettings({
+            ...settings,
+            input_gamepad_id: id,
+        })
+    }
 
     function setControllerVibration(){
         setSettings({
@@ -161,6 +171,50 @@ function SettingsInput() {
             </Head>
 
             <SettingsSidebar>
+                <Card className='padbottom'>
+                    <h1>{t('settings.input.controllerPickerTitle')}</h1>
+                    <p>{t('settings.input.controllerPickerDescription')}</p>
+
+                    <button
+                        type='button'
+                        className={ 'controller-choice' + (settings.input_gamepad_id ? '' : ' is-selected') }
+                        onClick={ () => selectController('') }
+                    >
+                        <span className='controller-choice-title'>{t('settings.input.controllerPickerFirst')}</span>
+                        <span className='controller-choice-meta'>{t('settings.input.controllerPickerFirstMeta')}</span>
+                        { settings.input_gamepad_id ? '' : <span className='controller-choice-activity'>{t('settings.input.controllerPickerUsed')}</span> }
+                    </button>
+
+                    { controllers.length === 0 ? <p>{t('settings.input.controllerPickerEmpty')}</p> : controllers.map((controller) => {
+                        const pinned = controllers.find((item) => item.id === settings.input_gamepad_id)
+                        const active = pinned || controllers[0]
+                        const selected = active.index === controller.index
+                        return (
+                            <button
+                                type='button'
+                                key={ controller.index + ':' + controller.id }
+                                className={ 'controller-choice' + (selected ? ' is-selected' : '') }
+                                onClick={ () => selectController(controller.id) }
+                            >
+                                <span className='controller-choice-title'>{ controller.label }</span>
+                                <span className='controller-choice-meta'>
+                                    { t('settings.input.controllerPickerSlot', { n: controller.index + 1 }) }
+                                    { ' · ' }
+                                    { controller.rumble ? t('settings.input.controllerPickerRumbleOn') : t('settings.input.controllerPickerRumbleOff') }
+                                </span>
+                                <span className='controller-choice-activity'>
+                                    { selected ? t('settings.input.controllerPickerUsed') + ' — ' : '' }
+                                    { controller.activity || t('settings.input.controllerPickerIdle') }
+                                </span>
+                            </button>
+                        )
+                    }) }
+
+                    { (settings.input_gamepad_id && !controllers.some((controller) => controller.id === settings.input_gamepad_id))
+                        ? <p>{t('settings.input.controllerPickerMissing')}</p>
+                        : '' }
+                </Card>
+
                 <Card>
                     <h1>{t('settings.input.title')}</h1>
 
@@ -193,29 +247,6 @@ function SettingsInput() {
                         </label><br />
                         <small>{t('settings.input.enableLegacyDescription')}</small>
                     </p>
-                </Card>
-
-                <Card>
-                    <h1>{t('settings.input.controllerDetectedTitle')}</h1>
-
-                    <p>{t('settings.input.controllerDetectedDescription')}</p>
-
-                    <div>
-                        {
-                            navigator.getGamepads().map((item, index) => {
-                                return (
-                                    <p key={ index }>
-                                #{ index+1 } &nbsp;
-
-                                        { (item) ?
-                                            item.id + ' ' + t('settings.input.axesLabel') + ': ' + item.axes.length + ', ' + t('settings.input.buttonsLabel') + ': ' + item.buttons.length + ', ' + t('settings.input.rumbleLabel') + ': ' + ((item.vibrationActuator !== null) ? (item.vibrationActuator as any).type : t('settings.input.notSupportedLabel'))
-                                            : t('settings.input.noControllerDetected')
-                                        }
-                                    </p>
-                                )
-                            })
-                        }
-                    </div>
                 </Card>
 
                 <Card hidden={ settings.input_newgamepad }>
