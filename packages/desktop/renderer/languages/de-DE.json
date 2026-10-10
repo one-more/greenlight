@@ -203,7 +203,10 @@
         "managementWarning": "Remote-Verwaltung nicht aktiviert",
         "streamingWarning": "Konsolen-Streaming nicht aktiviert",
         "startStreamBtn": "Starte Stream",
-        "noConsoles": "Es wurden keine Konsolen im Account gefunden. Wenn du eine Xbox-Konsole hast, stelle sicher, dass PlayTo aktiviert ist und die Konsole in der offiziellen Xbox App sichtbar ist."
+        "noConsoles": "Es wurden keine Konsolen im Account gefunden. Wenn du eine Xbox-Konsole hast, stelle sicher, dass PlayTo aktiviert ist und die Konsole in der offiziellen Xbox App sichtbar ist.",
+        "sessionExpired": "Die Xbox-Anmeldung ist abgelaufen. Greenlight konnte sie nicht erneuern. Bitte erneut anmelden und es dann noch einmal versuchen.",
+        "loadFailed": "Konsolen konnten nicht geladen werden.",
+        "retryBtn": "Erneut versuchen"
       },
       "titleInfo": {
         "pageTitle": "Titelinformationen anzeigen:",

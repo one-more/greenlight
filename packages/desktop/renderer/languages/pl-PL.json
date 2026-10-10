@@ -210,7 +210,10 @@
         "managementWarning": "Zdalne zarządzanie nie jest włączone",
         "streamingWarning": "Strumieniowanie z konsoli nie jest włączone",
         "startStreamBtn": "Uruchom Strumień",
-        "noConsoles": "Nie znaleziono konsol na twoim koncie. Jeśli masz konsolę Xbox, upewnij się że granie zdalne jest włączone i że konsola jest widoczna w oficjalnej Aplikacji Xbox."
+        "noConsoles": "Nie znaleziono konsol na twoim koncie. Jeśli masz konsolę Xbox, upewnij się że granie zdalne jest włączone i że konsola jest widoczna w oficjalnej Aplikacji Xbox.",
+        "sessionExpired": "Logowanie Xbox wygasło. Greenlight nie mógł go odświeżyć. Zaloguj się ponownie i spróbuj jeszcze raz.",
+        "loadFailed": "Nie udało się wczytać konsol.",
+        "retryBtn": "Spróbuj ponownie"
       },
 
       "titleInfo": {

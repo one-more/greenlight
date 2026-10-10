@@ -40,6 +40,7 @@ export default class Application {
     public _ipc:Ipc
     public _webUI:WebUI
     public _authentication:Authentication
+    private _sessionRefresh: Promise<void> | undefined
 
     private t = i18n.t.bind(i18n);
 
@@ -186,22 +187,43 @@ export default class Application {
     _xboxWorker:xboxWorker
 
 
-    authenticationCompleted(streamingTokens, webToken){
-        this.log('electron', __filename+'[authenticationCompleted()] authenticationCompleted called')
-        // const tokens = this._authentication._tokens
-        this._xHomeApi = new xCloudApi(this, streamingTokens.xHomeToken.data.offeringSettings.regions.find(region => region.isDefault).baseUri.substring(8), streamingTokens.xHomeToken.data.gsToken, 'home')
+    installSessionClients(streamingTokens, webToken){
+        const homeRegion = streamingTokens.xHomeToken.data.offeringSettings.regions.find(region => region.isDefault)
+        this._xHomeApi = new xCloudApi(this, homeRegion.baseUri.substring(8), streamingTokens.xHomeToken.data.gsToken, 'home')
 
         if(streamingTokens.xCloudToken !== undefined){
-            this._xCloudApi = new xCloudApi(this, streamingTokens.xCloudToken.data.offeringSettings.regions.find(region => region.isDefault).baseUri.substring(8), streamingTokens.xCloudToken.data.gsToken, 'cloud')
+            const cloudRegion = streamingTokens.xCloudToken.data.offeringSettings.regions.find(region => region.isDefault)
+            this._xCloudApi = new xCloudApi(this, cloudRegion.baseUri.substring(8), streamingTokens.xCloudToken.data.gsToken, 'cloud')
+            this._authentication._appLevel = 2
+        } else {
+            this._authentication._appLevel = 1
         }
 
         this._webApi = new xboxWebApi({
             token: webToken.data.Token,
             uhs: webToken.data.DisplayClaims.xui[0].uhs,
         })
+    }
+
+    refreshSessionTokens(){
+        if(this._sessionRefresh)
+            return this._sessionRefresh
+
+        const refresh = this._authentication.refreshSessionTokens().finally(() => {
+            if(this._sessionRefresh === refresh)
+                this._sessionRefresh = undefined
+        })
+        this._sessionRefresh = refresh
+        return refresh
+    }
+
+    authenticationCompleted(streamingTokens, webToken){
+        this.log('electron', __filename+'[authenticationCompleted()] authenticationCompleted called')
+        this.installSessionClients(streamingTokens, webToken)
 
         this._authentication._isAuthenticating = false
         this._authentication._isAuthenticated = true
+        this._authentication._authPromptOpen = false
 
         this._webApi.providers.profile.get('/users/me/profile/settings?settings=GameDisplayName,GameDisplayPicRaw,Gamerscore,Gamertag').then((result) => {
             if(result.data.profileUsers.length > 0) {

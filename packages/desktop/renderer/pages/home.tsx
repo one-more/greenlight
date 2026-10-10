@@ -12,8 +12,10 @@ import Label from '../components/ui/label'
 import Loader from '../components/ui/loader'
 
 function Home() {
-    const consoles = useQuery('consoles', () => Ipc.send('consoles', 'get'), { staleTime: 60*1000 })
+    const consoles = useQuery('consoles', () => Ipc.send('consoles', 'get'), { staleTime: 60*1000, retry: false })
     const { t } = useTranslation()
+    const consolesList = Array.isArray(consoles.data) ? consoles.data : []
+    const loadError = consoleLoadError(consoles.error)
 
     return (
         <React.Fragment>
@@ -29,7 +31,11 @@ function Home() {
                 paddingTop: '20px',
             }}>
                 { (consoles.isLoading === true) ? <Loader></Loader> :
-                    (consoles.isFetched === true && consoles.data.length > 0) ? consoles.data.map((item, i) => {
+                    (consoles.isError === true) ? <Card className='padbottom' key='consoles-error'>
+                        <p>{ loadError ? t('page.myConsoles.sessionExpired') : t('page.myConsoles.loadFailed') }</p>
+                        <Button label={t('page.myConsoles.retryBtn')} className='btn-primary' onClick={ () => { consoles.refetch() } }></Button>
+                    </Card> :
+                    (consolesList.length > 0) ? consolesList.map((item, i) => {
                         return (
                             <Card className='padbottom' key={i}>
                                 <h1>{item.name}</h1>
@@ -82,6 +88,14 @@ function Home() {
 
         </React.Fragment>
     )
+}
+
+function consoleLoadError(error){
+    const message = typeof error === 'string' ? error : (error?.message || '')
+    return message.includes('token_expired')
+        || message.includes('TokenRefreshError')
+        || message.includes('authenticate')
+        || message.includes('refresh')
 }
 
 export default Home

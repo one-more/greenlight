@@ -203,7 +203,10 @@
         "managementWarning": "La gestión remota no está activada",
         "streamingWarning": "El streaming de la consola no está activado",
         "startStreamBtn": "Iniciar streaming",
-        "noConsoles": "No se han encontrado consolas en tu cuenta. Si tienes una consola Xbox, asegúrate de que el juego remoto esté activado y de que la consola aparezca en la aplicación oficial de Xbox."
+        "noConsoles": "No se han encontrado consolas en tu cuenta. Si tienes una consola Xbox, asegúrate de que el juego remoto esté activado y de que la consola aparezca en la aplicación oficial de Xbox.",
+        "sessionExpired": "La sesión de Xbox ha caducado. Greenlight no pudo renovarla. Vuelve a iniciar sesión y reintenta.",
+        "loadFailed": "No se pudieron cargar tus consolas.",
+        "retryBtn": "Reintentar"
       },
       "titleInfo": {
         "pageTitle": "Viendo información del título:",

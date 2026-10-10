@@ -1,4 +1,5 @@
 import IpcBase from './base'
+import { withXboxTokenRetry } from '../helpers/xboxAuth'
 
 export default class IpcConsoles extends IpcBase {
     // _streamingSessions:any = {}
@@ -7,19 +8,15 @@ export default class IpcConsoles extends IpcBase {
     _consolesLastUpdate = 0
 
     get(){
-        return new Promise((resolve, reject) => {
-            if(this._consolesLastUpdate < Date.now() - 60*1000){
-                this._application._webApi.providers.smartglass.getConsolesList().then((consoles) => {
-                    this._consoles = consoles.data.result
-                    this._consolesLastUpdate = Date.now()
+        if(this._consolesLastUpdate >= Date.now() - 60*1000)
+            return Promise.resolve(this._consoles)
 
-                    resolve(this._consoles)
-                }).catch((error) => {
-                    reject(error)
-                })
-            } else {
-                resolve(this._consoles)
-            }
+        return withXboxTokenRetry(this._application, () => {
+            return this._application._webApi.providers.smartglass.getConsolesList()
+        }).then((consoles) => {
+            this._consoles = consoles.data?.result || []
+            this._consolesLastUpdate = Date.now()
+            return this._consoles
         })
     }
 }

@@ -1,4 +1,5 @@
 import Application from '../application'
+import { withXboxTokenRetry } from './xboxAuth'
 
 export default class xboxWorker {
 
@@ -40,16 +41,14 @@ export default class xboxWorker {
     }
 
     updateFriends(){
-        return new Promise((resolve, reject) => {
-            this._application._webApi.providers.people.getFriends().then((friends) => {
-                for(const friend in friends.data.people){
-                    this._friends[friends.data.people[friend].xuid] = friends.data.people[friend]
-                }
+        return withXboxTokenRetry(this._application, () => {
+            return this._application._webApi.providers.people.getFriends()
+        }).then((friends) => {
+            for(const friend in friends.data.people){
+                this._friends[friends.data.people[friend].xuid] = friends.data.people[friend]
+            }
 
-                resolve(this._friends)
-            }).catch((error) => {
-                reject(error)
-            })
+            return this._friends
         })
     }
 

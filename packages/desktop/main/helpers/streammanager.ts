@@ -68,7 +68,8 @@ export default class StreamManager {
         return new Promise((resolve, reject) => {
             const session = this.getSession(sessionId)
             if(session === undefined){
-                reject('Session not found: '+sessionId)
+                this._application.log('StreamManager', 'stopStream('+sessionId+') session is already gone')
+                resolve(false)
                 return
             }
 

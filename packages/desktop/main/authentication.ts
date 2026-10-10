@@ -3,6 +3,7 @@ import { createWindow } from './helpers'
 import Application from './application'
 import { Msal } from 'xal-node'
 import AuthTokenStore from './helpers/tokenstore'
+import { needsInteractiveSignIn } from './helpers/xboxAuth'
 import i18n from 'i18next';
 
 
@@ -18,6 +19,7 @@ export default class Authentication {
     _isAuthenticating:boolean = false
     _isAuthenticated:boolean = false
     _appLevel:number = 0
+    _authPromptOpen:boolean = false
 
     private t = i18n.t.bind(i18n);
 
@@ -108,7 +110,32 @@ export default class Authentication {
         })
     }
 
+    refreshSessionTokens(){
+        this._application.log('authenticationV2', '[refreshSessionTokens()] Refreshing Xbox session tokens')
+        const msalCache = this._msal as unknown as { _xstsToken?: unknown, _gssvToken?: unknown }
+        msalCache._xstsToken = undefined
+        msalCache._gssvToken = undefined
+
+        return this.getStreamingToken().then((streamingTokens) => {
+            return this._msal.getWebToken().then((webToken) => {
+                this._application.installSessionClients(streamingTokens, webToken)
+                this._application.log('authenticationV2', '[refreshSessionTokens()] Xbox session tokens refreshed')
+            })
+        }).catch((error) => {
+            this._application.log('authenticationV2', '[refreshSessionTokens()] Failed to refresh Xbox session tokens:', error)
+            if(needsInteractiveSignIn(error) && this._authPromptOpen === false)
+                this.startAuthflow()
+            throw error
+        })
+    }
+
     startAuthflow(){
+        if(this._authPromptOpen === true){
+            this._application.log('authenticationV2', '[startAuthflow()] Authentication is already in progress')
+            return
+        }
+
+        this._authPromptOpen = true
         this._application.log('authenticationV2', '[startAuthflow()] Starting authentication flow')
 
         const forceRegionIp = this._application._store.get('force_region_ip', '')
@@ -139,11 +166,13 @@ export default class Authentication {
                 dialog.showErrorBox('Error', 'Failed to perform MSAL authentixation: ' + JSON.stringify(error))
 
                 this._isAuthenticating = false
+                this._authPromptOpen = false
             })
 
         }).catch((error) => {
             this._application.log('authenticationV2', '[startAuthflow()] Error during devicecode auth:', error)
             dialog.showErrorBox('Error', this.t('errors.errorAuthentificationUser') + ' ' + JSON.stringify(error))
+            this._authPromptOpen = false
         })
     }
 
