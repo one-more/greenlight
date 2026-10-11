@@ -3,7 +3,12 @@ import Store from 'electron-store'
 
 export default class AuthTokenStore extends TokenStore {
 
-    private _store = new Store()
+    private _store: Store
+
+    constructor(store?: Store) {
+        super()
+        this._store = store || new Store()
+    }
 
     load() {
         const tokens = this._store.get('user.tokenstore', '{}') as string

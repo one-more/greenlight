@@ -150,6 +150,107 @@ function logPlaybackTiming(stats: RTCStatsReport) {
     })
 }
 
+type ConsolePlayer = {
+    getEventBus: () => { on: (name: string, listener: (event) => void) => void, off: (name: string, listener: (event) => void) => void }
+    getChannelProcessor: (name: string) => { requestKeyframeRequest?: () => void, sendTransaction?: (id: string, data) => void }
+    _webrtcClient?: RTCPeerConnection
+    _videoComponent?: { _videoRender?: HTMLVideoElement }
+}
+
+// The console keeps the last dashboard frame when a game takes over the screen.
+// Ask for a new keyframe, and acknowledge the title change so the stream can follow it.
+export function followConsolePicture(player: ConsolePlayer): () => void {
+    let lastDecoded = -1
+    let lastProgress = performance.now()
+    let lastRequest = 0
+    let sawFrames = false
+    let reattached = false
+
+    const requestKeyframe = (reason: string) => {
+        try {
+            player.getChannelProcessor('control')?.requestKeyframeRequest?.()
+            logStreamPath(`requested a fresh video frame (${reason})`)
+        } catch (error) {
+            logStreamPath(`could not request a fresh video frame: ${error}`)
+        }
+    }
+
+    const onMessage = (event) => {
+        const type = String(event?.type || 'message')
+        const target = String(event?.target || '')
+        logStreamPath(`console ${type} ${target || '(no target)'}`)
+
+        const titleChange = /titleinfo|titlechanged|ShowApplication/i.test(target)
+        const needsReply = type === 'Transaction' || type === 'ReceiverRequest'
+        const leaveForUser = /purchase|ShowMessageDialog/i.test(target)
+        if(needsReply && event?.id && titleChange && !leaveForUser){
+            try {
+                player.getChannelProcessor('message')?.sendTransaction?.(event.id, { Result: 0 })
+                logStreamPath(`acknowledged console request ${target}`)
+            } catch (error) {
+                logStreamPath(`could not acknowledge ${target}: ${error}`)
+            }
+        }
+        if(titleChange){
+            requestKeyframe('the console opened a game')
+        }
+    }
+
+    player.getEventBus().on('message', onMessage)
+
+    const timer = setInterval(async () => {
+        const peer = player._webrtcClient
+        if(!peer || peer.connectionState !== 'connected'){
+            return
+        }
+        let decoded = 0
+        try {
+            const stats = await peer.getStats()
+            stats.forEach((report) => {
+                const sample = report as RTCInboundRtpStreamStats
+                if(sample.type === 'inbound-rtp' && sample.kind === 'video'){
+                    decoded = sample.framesDecoded || 0
+                }
+            })
+        } catch {
+            return
+        }
+
+        const now = performance.now()
+        if(decoded > lastDecoded){
+            lastDecoded = decoded
+            lastProgress = now
+            reattached = false
+            if(decoded > 0){
+                sawFrames = true
+            }
+            return
+        }
+        if(!sawFrames || now - lastProgress < 1500 || now - lastRequest < 3000){
+            return
+        }
+
+        lastRequest = now
+        const stalled = Math.round((now - lastProgress) / 1000)
+        requestKeyframe(`picture frozen for ${stalled}s`)
+
+        const video = player._videoComponent?._videoRender
+        if(video && stalled >= 4 && !reattached && video.srcObject){
+            reattached = true
+            const source = video.srcObject
+            video.srcObject = null
+            video.srcObject = source
+            video.play().catch(() => {})
+            logStreamPath('reattached the video picture after it stayed on the previous screen')
+        }
+    }, 500)
+
+    return () => {
+        clearInterval(timer)
+        player.getEventBus().off('message', onMessage)
+    }
+}
+
 function averageMs(totalSeconds: number | undefined, count: number | undefined): number | null {
     if(typeof totalSeconds !== 'number' || typeof count !== 'number' || count <= 0){
         return null

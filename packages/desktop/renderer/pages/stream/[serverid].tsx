@@ -8,7 +8,7 @@ import StreamComponent from '../../components/ui/streamcomponent'
 import StreamPreload from '../../components/ui/streampreload'
 import Ipc from '../../lib/ipc'
 import { installSelectedGamepad } from '../../lib/gamepadSelection'
-import { applyLowLatencyReceivers, logIceList, logSelectedIcePath, logStreamPath, waitForLocalIce } from '../../lib/streamPath'
+import { applyLowLatencyReceivers, followConsolePicture, logIceList, logSelectedIcePath, logStreamPath, waitForLocalIce } from '../../lib/streamPath'
 import { useTranslation } from 'react-i18next'
 
 function Stream() {
@@ -34,8 +34,10 @@ function Stream() {
         }
 
         let restoreGamepad = () => {}
+        let stopFollowingPicture = () => {}
 
         if(xPlayer !== undefined){
+            stopFollowingPicture = followConsolePicture(xPlayer)
             restoreGamepad = installSelectedGamepad(settings.input_gamepad_id || '')
             document.getElementById('streamComponentHolder').innerHTML = '<div id="streamComponent" class="size_'+settings.video_size+'"></div>'
             xPlayer.bind()
@@ -209,7 +211,9 @@ function Stream() {
 
                             // Start xPlayer interface
                             setxPlayer(new xCloudPlayer('streamComponent', {
-                                ui_systemui: [],
+                                // 31 is ShowApplication. An empty list tells the console this client
+                                // cannot leave the dashboard, so a launched game never appears in the stream.
+                                ui_systemui: [31],
                                 input_touch: settings.input_touch || false,
                                 input_mousekeyboard: settings.input_mousekeyboard || false,
                                 input_legacykeyboard: (settings.input_newgamepad) ? false : true,
@@ -254,6 +258,7 @@ function Stream() {
 
         // Modal window
         return () => {
+            stopFollowingPicture()
             restoreGamepad()
 
             if(xPlayer !== undefined){

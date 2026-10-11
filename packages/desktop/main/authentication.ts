@@ -3,7 +3,8 @@ import { createWindow } from './helpers'
 import Application from './application'
 import { Msal } from 'xal-node'
 import AuthTokenStore from './helpers/tokenstore'
-import { needsInteractiveSignIn } from './helpers/xboxAuth'
+import { appendAuthLog } from './helpers/streamPathFile'
+import { isRejectedRefresh, summarizeAuthError } from './helpers/xboxAuth'
 import i18n from 'i18next';
 
 
@@ -25,7 +26,7 @@ export default class Authentication {
 
     constructor(application:Application){
         this._application = application
-        this._tokenStore = new AuthTokenStore()
+        this._tokenStore = new AuthTokenStore(application._store)
         this._tokenStore.load()
         this._msal = new Msal(this._tokenStore)
     }
@@ -72,49 +73,88 @@ export default class Authentication {
             this._msal.setDefaultHeaders({})
         }
 
-        this.getTokens()
+        this.restoreSession()
     }
 
-    getTokens(){
-        this.getStreamingToken().then((streamingTokens) => {
-            this._application.log('authenticationV2', '[getTokens()] Retrieved streaming tokens:', streamingTokens)
+    // An expired one-hour access token is normal after a restart. Renew the
+    // saved sign-in and continue. Ask the user to sign in again only when
+    // Microsoft rejects the refresh token.
+    restoreSession(){
+        this.openSession().catch((error) => {
+            this.noteAuthFailure('saved session', error)
+            if(isRejectedRefresh(error)){
+                this._isAuthenticating = false
+                this.startAuthflow()
+                return
+            }
+
+            this.clearXboxSessionCache()
+            this._msal.refreshUserToken().then(() => {
+                return this.openSession()
+            }).catch((retryError) => {
+                this.noteAuthFailure('saved session retry', retryError)
+                this._isAuthenticating = false
+                if(isRejectedRefresh(retryError))
+                    this.startAuthflow()
+            })
+        })
+    }
+
+    openSession(){
+        return this.ensureFreshUserToken().then(() => {
+            return this.getStreamingToken()
+        }).then((streamingTokens) => {
+            this._application.log('authenticationV2', '[openSession()] Retrieved streaming tokens')
 
             if(streamingTokens.xCloudToken !== undefined){
-                this._application.log('authenticationV2', '[getTokens()] Retrieved both xHome and xCloud tokens')
+                this._application.log('authenticationV2', '[openSession()] Retrieved both xHome and xCloud tokens')
                 this._appLevel = 2
             } else {
-                this._application.log('authenticationV2', '[getTokens()] Retrieved xHome token only')
+                this._application.log('authenticationV2', '[openSession()] Retrieved xHome token only')
                 this._appLevel = 1
             }
 
-            this._msal.getWebToken().then((webToken) => {
-                this._application.log('authenticationV2', __filename+'[getTokens()] Web token received')
+            return this._msal.getWebToken().then((webToken) => {
+                this._application.log('authenticationV2', '[openSession()] Web token received')
                 this._application.authenticationCompleted(streamingTokens, webToken)
-
-            }).catch((error) => {
-                this._application.log('authenticationV2', __filename+'[getTokens()] Failed to retrieve web tokens:', error)
-                dialog.showMessageBox({
-                    message: this.t('errors.failedToRetrieveWebTokens') + ' ' + JSON.stringify(error),
-                    type: 'error',
-                })
             })
-
-        }).catch((err) => {
-            this._application.log('authenticationV2', '[startSilentFlow()] Failed to retrieve streaming tokens:', err)
-            dialog.showMessageBox({
-                message: "Failed to retrieve streaming tokens. Please sign in again.",
-                type: 'error',
-            })
-            // @TODO: If we fail to get streaming tokens, we should probably start the auth flow to let the user re-authenticate and get new tokens.
-            this.startAuthflow()
         })
+    }
+
+    ensureFreshUserToken(){
+        const userToken = this._tokenStore.getUserToken()
+        if(userToken === undefined || userToken.getSecondsValid() > 60)
+            return Promise.resolve()
+
+        this._application.log('authenticationV2', '[ensureFreshUserToken()] Access token expired. Refreshing the saved sign-in.')
+        appendAuthLog('access token expired; refreshing saved sign-in')
+        return this._msal.refreshUserToken().then(() => undefined)
+    }
+
+    getTokens(){
+        this.openSession().catch((error) => {
+            this.noteAuthFailure('sign-in', error)
+            this._isAuthenticating = false
+            if(isRejectedRefresh(error))
+                this.startAuthflow()
+        })
+    }
+
+    clearXboxSessionCache(){
+        const msalCache = this._msal as unknown as { _xstsToken?: unknown, _gssvToken?: unknown }
+        msalCache._xstsToken = undefined
+        msalCache._gssvToken = undefined
+    }
+
+    noteAuthFailure(step: string, error: unknown){
+        const summary = summarizeAuthError(error)
+        this._application.log('authenticationV2', `[${step}] ${summary}`)
+        appendAuthLog(`${step}: ${summary}`)
     }
 
     refreshSessionTokens(){
         this._application.log('authenticationV2', '[refreshSessionTokens()] Refreshing Xbox session tokens')
-        const msalCache = this._msal as unknown as { _xstsToken?: unknown, _gssvToken?: unknown }
-        msalCache._xstsToken = undefined
-        msalCache._gssvToken = undefined
+        this.clearXboxSessionCache()
 
         return this.getStreamingToken().then((streamingTokens) => {
             return this._msal.getWebToken().then((webToken) => {
@@ -122,8 +162,8 @@ export default class Authentication {
                 this._application.log('authenticationV2', '[refreshSessionTokens()] Xbox session tokens refreshed')
             })
         }).catch((error) => {
-            this._application.log('authenticationV2', '[refreshSessionTokens()] Failed to refresh Xbox session tokens:', error)
-            if(needsInteractiveSignIn(error) && this._authPromptOpen === false)
+            this.noteAuthFailure('session refresh', error)
+            if(isRejectedRefresh(error) && this._authPromptOpen === false)
                 this.startAuthflow()
             throw error
         })
