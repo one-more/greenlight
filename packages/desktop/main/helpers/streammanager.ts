@@ -16,6 +16,16 @@ interface streamSession {
     };
 }
 
+function sessionStatus(error: unknown): number | undefined {
+    const status = (error as { status?: number })?.status
+    return typeof status === 'number' ? status : undefined
+}
+
+function isFinishedSession(error: unknown): boolean {
+    const status = sessionStatus(error)
+    return status === 401 || status === 404 || status === 410
+}
+
 export default class StreamManager {
 
     _application:Application
@@ -64,28 +74,48 @@ export default class StreamManager {
         })
     }
 
-    stopStream(sessionId){
-        return new Promise((resolve, reject) => {
-            const session = this.getSession(sessionId)
-            if(session === undefined){
-                this._application.log('StreamManager', 'stopStream('+sessionId+') session is already gone')
-                resolve(false)
-                return
+    async stopStream(sessionId){
+        const session = this.getSession(sessionId)
+        if(session === undefined){
+            this._application.log('StreamManager', 'stopStream('+sessionId+') session is already gone')
+            return false
+        }
+
+        try {
+            const result = await this.getApi(session.type).stopStream(sessionId)
+            this.dropSession(sessionId)
+            return result
+        } catch (error) {
+            if(!isFinishedSession(error))
+                throw error
+
+            // A 401 here is usually an expired streaming token, not a failed disconnect.
+            // Refresh once and tell the console to end the session again.
+            if(sessionStatus(error) === 401){
+                this._application.log('StreamManager', 'stopStream('+sessionId+') streaming token was not accepted. Refreshing and ending the session once more.')
+                try {
+                    await this._application.refreshSessionTokens()
+                    const result = await this.getApi(session.type).stopStream(sessionId)
+                    this.dropSession(sessionId)
+                    return result
+                } catch (retryError) {
+                    if(!isFinishedSession(retryError)){
+                        this._application.log('StreamManager', 'stopStream('+sessionId+') could not refresh the streaming token. Closing the local session.')
+                    }
+                }
             }
 
-            this.getApi(session.type).stopStream(sessionId).then((result) => {
-                console.log('Current sessions:', this._sessions)
-                delete this._sessions[sessionId]
-                console.log('new sessions:', this._sessions)
-                if(Object.keys(this._sessions).length === 0){
-                    releaseStreamPerformance(this._application._mainWindow)
-                }
+            this._application.log('StreamManager', 'stopStream('+sessionId+') session is already closed')
+            this.dropSession(sessionId)
+            return false
+        }
+    }
 
-                resolve(result)
-            }).catch((error) => {
-                reject(error)
-            })
-        })
+    dropSession(sessionId){
+        delete this._sessions[sessionId]
+        if(Object.keys(this._sessions).length === 0){
+            releaseStreamPerformance(this._application._mainWindow)
+        }
     }
 
     sendSdp(sessionId:string, sdp:any){
@@ -218,10 +248,7 @@ export default class StreamManager {
 
                 if(error.status === 404){
                     this._application.log('StreamManager', 'Session not found on server. Removing session...')
-                    delete this._sessions[sessionId]
-                    if(Object.keys(this._sessions).length === 0){
-                        releaseStreamPerformance(this._application._mainWindow)
-                    }
+                    this.dropSession(sessionId)
                 } else {
                     this.monitorSession(sessionId)
                 }

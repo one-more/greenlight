@@ -285,10 +285,17 @@ function Stream() {
     }
 
     function onDisconnect(){
+        if(keepaliveInterval){
+            clearInterval(keepaliveInterval)
+            keepaliveInterval = undefined
+        }
+
         Ipc.send('streaming', 'stopStream', {
             sessionId: sessionId,
         }).then((result) => {
             console.log('Stream stopped:', result)
+        }).catch((error) => {
+            console.log('Stream already ended:', error)
         })
 
         if(streamStateInterval){
